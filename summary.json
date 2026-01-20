@@ -1,7 +1,7 @@
 {
-  "date": "2026-01-20 11:03",
+  "date": "2026-01-20 11:47",
   "dust_detected": true,
-  "avg_loss_percent": 13.8,
-  "forecasted_energy_kWh": 4117.39,
-  "health_score": 71.2
+  "avg_loss_percent": 14.42,
+  "forecasted_energy_kWh": 4660.9,
+  "health_score": 70.6
 }
