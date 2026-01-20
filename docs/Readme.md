@@ -263,9 +263,13 @@ This launches:
 **Suresh Kumar**
 M.Tech Integrated – Data Science
 VIT
+
+---
 **Rakesh**
 M.Tech Integrated – Data Science
 VIT
+
+---
 **Sruthilaiya**
 M.Tech Integrated – Data Science
 VIT
