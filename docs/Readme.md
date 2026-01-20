@@ -292,6 +292,4 @@ A complete, real-world inspired smart energy system — not just a machine learn
 
 ---
 
-If you’re a judge, recruiter, or collaborator — feel free to reach out! ☀️🚀
-
 
