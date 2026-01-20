@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-01-21 00:05:10",
+  "sensor_data": {
+    "irradiation": 445.65,
+    "ambient_temp": 31.22,
+    "module_temp": 45.81,
+    "wind_speed": 4.86
+  },
+  "expected_power_W": 434.95,
+  "vision_result": "BirdDroppings",
+  "dust_detected": false,
+  "decision": "\ud83e\uddf9 Cleaning Required - Bird Droppings Detected"
+}

@@ -3,69 +3,60 @@ import requests
 import pandas as pd
 import datetime
 import time
+import os
+import sys
 
-# -----------------------------
-# CONFIG
-# -----------------------------
+# Add the whatsapp module to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'whatsapp'))
+from whatsapp import send_whatsapp_message
+
 API_URL = "http://127.0.0.1:5000/api/summary"
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 
 LAT = 12.9184
 LON = 79.1325
-
 REFRESH_SECONDS = 10
 
-# -----------------------------
-# PAGE SETUP
-# -----------------------------
+HISTORY_FILE = "history.csv"
+
 st.set_page_config(
     page_title="Solar Edge AI Dashboard",
     page_icon="☀️",
     layout="centered"
 )
 
-st.markdown(
-    """
-    <style>
-    .big-number {
-        font-size: 36px;
-        font-weight: bold;
-        color: #ff9800;
-    }
-    .card {
-        padding: 15px;
-        border-radius: 12px;
-        background-color: #f9f9f9;
-        box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
-        margin-bottom: 10px;
-    }
-    .status-good {
-        color: #2e7d32;
-        font-weight: bold;
-    }
-    .status-warn {
-        color: #f9a825;
-        font-weight: bold;
-    }
-    .status-bad {
-        color: #c62828;
-        font-weight: bold;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# ------------------------
+# STYLE
+# ------------------------
+st.markdown("""
+<style>
+.big-number {
+    font-size: 36px;
+    font-weight: bold;
+    color: #ff9800;
+}
+.card {
+    padding: 15px;
+    border-radius: 12px;
+    background-color: #f9f9f9;
+    box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+}
+.status-good { color: #2e7d32; font-weight: bold; }
+.status-warn { color: #f9a825; font-weight: bold; }
+.status-bad { color: #c62828; font-weight: bold; }
+</style>
+""", unsafe_allow_html=True)
 
-# -----------------------------
-# HELPERS
-# -----------------------------
+# ------------------------
+# DATA FUNCTIONS
+# ------------------------
 def fetch_solar_data():
     try:
         res = requests.get(API_URL, timeout=5)
         return res.json()
     except:
         return None
-
 
 def fetch_weather():
     try:
@@ -80,7 +71,6 @@ def fetch_weather():
         return res.json()
     except:
         return None
-
 
 def calculate_weather_summary(weather_json):
     rain = weather_json["hourly"]["precipitation"]
@@ -98,100 +88,189 @@ def calculate_weather_summary(weather_json):
         "uv_index": weather_json["hourly"]["uv_index"][0]
     }
 
-
-def system_decision(dust, rain_expected):
-    if dust and rain_expected:
-        return "🕒 CLEANING POSTPONED", "status-warn", "Rain expected. Natural cleaning will occur."
-    elif dust and not rain_expected:
+def system_decision(dust_detected, vision_label, avg_loss_percent, rain_expected):
+    """
+    Decision engine fusing edge data and weather.
+    """
+    if vision_label == "ElectricalDamage":
+        return "🚨 CRITICAL FAULT", "status-bad", "Electrical damage detected. Immediate inspection required."
+    elif vision_label == "BirdDroppings":
+        return "🧹 CLEANING REQUIRED", "status-bad", "Bird droppings detected on panels."
+    elif dust_detected and rain_expected:
+        return "🕒 CLEANING POSTPONED", "status-warn", "Dust detected but rain expected for natural cleaning."
+    elif dust_detected and not rain_expected:
         return "🚨 ACTION REQUIRED", "status-bad", "Dust detected. Manual cleaning recommended."
+    elif avg_loss_percent > 20:
+        return "⚠️ HIGH LOSS DETECTED", "status-warn", f"Power loss at {avg_loss_percent}%. Check system."
     else:
-        return "✅ SYSTEM HEALTHY", "status-good", "Panels are clean. No action required."
+        return "✅ SYSTEM HEALTHY", "status-good", "All systems normal."
 
+# ------------------------
+# HISTORY TRACKING
+# ------------------------
+def load_history():
+    """Load history from CSV file. Return empty DataFrame if file doesn't exist."""
+    if os.path.exists(HISTORY_FILE):
+        return pd.read_csv(HISTORY_FILE)
+    return pd.DataFrame()
 
-# -----------------------------
-# TITLE
-# -----------------------------
+def save_history(row):
+    df = pd.DataFrame([row])
+    if not os.path.exists(HISTORY_FILE):
+        df.to_csv(HISTORY_FILE, index=False)
+    else:
+        df.to_csv(HISTORY_FILE, mode="a", header=False, index=False)
+
+def send_cleaning_request(method):
+    """
+    Send cleaning request to API.
+    """
+    clean_url = "http://127.0.0.1:5000/api/clean"
+    data = {
+        "method": method,
+        "message": f"Panel cleaning required. Method: {method}"
+    }
+    try:
+        requests.post(clean_url, json=data, timeout=5)
+    except:
+        pass  # Ignore errors for demo
+
+# ------------------------
+# MAIN
+# ------------------------
 st.markdown("## ☀️ Solar Edge AI Dashboard")
-st.caption("Edge AI → API → Mobile Dashboard (Low Internet Architecture)")
+st.caption("Raspberry Pi → Edge AI → API → Mobile Dashboard")
 
-# Auto refresh
-st.empty()
-time.sleep(0.1)
-# st.rerun()  # Commented out to prevent infinite loop
-
-# -----------------------------
-# FETCH DATA
-# -----------------------------
 solar = fetch_solar_data()
 weather_raw = fetch_weather()
 
-if solar is None or weather_raw is None:
+if solar is None or "error" in solar or weather_raw is None:
     st.error("Unable to connect to Edge API or Weather Service")
     st.stop()
 
 weather = calculate_weather_summary(weather_raw)
 
-# -----------------------------
-# ENRICH DATA
-# -----------------------------
-current_power = round((solar["forecasted_energy_kWh"] / 24) * 1.2, 2)
-health_score = round(100 - solar["avg_loss_percent"], 2)
+# Save history
+# Safely choose a time key from the solar summary. If missing, use current time.
+if "date" in solar:
+    time_key = "date"
+elif "timestamp" in solar:
+    time_key = "timestamp"
+else:
+    time_key = None
 
+if time_key and time_key in solar:
+    time_value = solar[time_key]
+else:
+    # Fall back to current UTC time ISO string
+    time_value = datetime.datetime.utcnow().isoformat()
+
+history_row = {
+    "time": time_value,
+    "expected_power": solar.get("expected_power"),
+    "avg_loss_percent": solar.get("avg_loss_percent"),
+    "health_score": solar.get("health_score"),
+    "vision_label": solar.get("vision_label"),
+    "dust_detected": solar.get("dust_detected")
+}
+save_history(history_row)
+
+history_df = load_history()
+
+# ------------------------
+# STATUS CARD
+# ------------------------
 status, status_class, status_reason = system_decision(
     solar["dust_detected"],
+    solar["vision_label"],
+    solar["avg_loss_percent"],
     weather["rain_expected"]
 )
 
-# -----------------------------
-# STATUS CARD
-# -----------------------------
-st.markdown(
-    f"""
-    <div class="card">
-        <div class="{status_class}">{status}</div>
-        <div>{status_reason}</div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown(f"""
+<div class="card">
+    <div class="{status_class}">{status}</div>
+    <div>{status_reason}</div>
+</div>
+""", unsafe_allow_html=True)
 
-# -----------------------------
+# ------------------------
+# CLEANING OPTIONS
+# ------------------------
+if "ACTION REQUIRED" in status or "CLEANING REQUIRED" in status:
+    st.markdown("### 🧹 Select Cleaning Method")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🤖 Robot Cleaning"):
+            send_cleaning_request("robot")
+            st.success("Cleaning request sent to Robot!")
+    
+    with col2:
+        if st.button("💧 Pressurized Water"):
+            send_cleaning_request("pressurized_water")
+            st.success("Cleaning request sent to Pressurized Water system!")
+    
+    with col3:
+        if st.button("👷 Cleaning Agency"):
+            send_cleaning_request("cleaning_agency")
+            # Send WhatsApp message
+            whatsapp_message = "🚨 Solar Panel Cleaning Required: Dust detected. Please send cleaning agency immediately."
+            if send_whatsapp_message(whatsapp_message):
+                st.success("Cleaning request sent to Cleaning Agency and WhatsApp!")
+            else:
+                st.success("Cleaning request sent to Cleaning Agency! (WhatsApp demo mode)")
+
+# ------------------------
+# PANEL IMAGE
+# ------------------------
+if "panel_image" in solar:
+    import base64
+    image_data = base64.b64decode(solar["panel_image"])
+    st.image(image_data, caption="Panel Image", width=222)
+
+# ------------------------
 # METRICS
-# -----------------------------
+# ------------------------
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### ⚡ Current Power")
-    st.markdown(f"<div class='big-number'>{current_power} kW</div>", unsafe_allow_html=True)
+    st.markdown("### ⚡ Expected Power")
+    st.markdown(f"<div class='big-number'>{solar['expected_power']} W</div>", unsafe_allow_html=True)
 
-    st.markdown("### 📈 Energy Forecast")
-    st.markdown(f"<div class='big-number'>{solar['forecasted_energy_kWh']} kWh</div>", unsafe_allow_html=True)
+    st.markdown("### 🏥 Health Score")
+    st.markdown(f"<div class='big-number'>{solar['health_score']}%</div>", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("### 🏥 Health Score")
-    st.markdown(f"<div class='big-number'>{health_score} %</div>", unsafe_allow_html=True)
+    st.markdown("### 📉 Avg Loss %")
+    st.markdown(f"<div class='big-number'>{solar['avg_loss_percent']}%</div>", unsafe_allow_html=True)
 
-    st.markdown("### 📉 Avg Loss")
-    st.markdown(f"<div class='big-number'>{solar['avg_loss_percent']} %</div>", unsafe_allow_html=True)
+    st.markdown("### 👁 Vision Label")
+    st.markdown(f"<div class='big-number'>{solar['vision_label']}</div>", unsafe_allow_html=True)
 
-# -----------------------------
-# SYSTEM INFO
-# -----------------------------
-st.markdown("## 🔧 System Health")
+# ------------------------
+# GRAPHS
+# ------------------------
+st.markdown("## 📊 Performance Graph (8 AM - 6 PM)")
 
-sys_col1, sys_col2 = st.columns(2)
+if len(history_df) > 2:
+    history_df["time"] = pd.to_datetime(history_df["time"])
+    # Filter to daytime hours 8 AM to 6 PM
+    daytime_df = history_df[(history_df["time"].dt.hour >= 8) & (history_df["time"].dt.hour <= 18)]
 
-with sys_col1:
-    st.write("🧹 Dust Detected:", "Yes" if solar["dust_detected"] else "No")
-    st.write("📆 Date:", datetime.datetime.now().strftime("%Y-%m-%d"))
+    if len(daytime_df) > 0:
+        st.line_chart(
+            daytime_df.set_index("time")[["expected_power"]],
+            height=250
+        )
+    else:
+        st.info("No daytime data available for graph.")
+else:
+    st.info("Collecting data for performance visualization...")
 
-with sys_col2:
-    st.write("🔋 Efficiency:", f"{health_score}%")
-    st.write("📡 Data Source:", "Edge AI Node")
-
-# -----------------------------
+# ------------------------
 # WEATHER
-# -----------------------------
+# ------------------------
 st.markdown("## 🌦 Weather Conditions")
 
 wcol1, wcol2 = st.columns(2)
@@ -206,30 +285,8 @@ with wcol2:
     st.write("🌞 UV Index:", weather["uv_index"])
     st.write("🌧 Rain Volume:", f"{weather['rain_volume_mm']} mm")
 
-# -----------------------------
-# DAILY ENERGY FORECAST CHART
-# -----------------------------
-st.markdown("## 📊 Daily Energy Forecast")
+st.caption("Powered by Raspberry Pi Edge AI • Open-Meteo • Streamlit")
 
-hours = ["6 AM", "8 AM", "10 AM", "12 PM", "2 PM", "4 PM", "6 PM"]
-forecast = [
-    solar["forecasted_energy_kWh"] * 0.05,
-    solar["forecasted_energy_kWh"] * 0.12,
-    solar["forecasted_energy_kWh"] * 0.22,
-    solar["forecasted_energy_kWh"] * 0.28,
-    solar["forecasted_energy_kWh"] * 0.20,
-    solar["forecasted_energy_kWh"] * 0.10,
-    solar["forecasted_energy_kWh"] * 0.03,
-]
-
-df = pd.DataFrame({
-    "Time": hours,
-    "Forecasted Energy (kWh)": forecast
-})
-
-st.line_chart(df.set_index("Time"))
-
-# -----------------------------
-# FOOTER
-# -----------------------------
-st.caption("Powered by Edge AI • Weather API • Streamlit Mobile UI")
+# Auto refresh
+time.sleep(REFRESH_SECONDS)
+st.rerun()

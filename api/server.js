@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 
 // Path to EDGE folder
-const EDGE_PATH = path.join(__dirname, "../edge");
+const EDGE_PATH = path.join(__dirname, "../EdgeAI");
 
 // Route: Get summary.json
 app.get("/api/summary", (req, res) => {
