@@ -56,47 +56,6 @@ This project simulates a **real-world solar farm deployment** where connectivity
 
 ---
 
-## 📁 Folder Structure
-
-```
-solar-app/
-│
-├── edge/                       # Simulated Raspberry Pi / Edge AI
-│   ├── edge_run.py            # ML model + dust + loss + forecast logic
-│   ├── model.pkl             # Trained expected power model
-│   ├── sensors.py           # Sensor simulation (optional)
-│   ├── config.py            # Thresholds & system constants
-│   └── requirements.txt     # Python dependencies
-│
-├── api/                      # Backend REST API
-│   ├── server.js            # Node Express server
-│   ├── package.json
-│   └── routes/
-│       └── summary.js      # /api/summary endpoint
-│
-├── dashboard/               # Mobile Dashboard (Streamlit)
-│   ├── dashboard.py        # UI + Weather + Decision Engine
-│   └── requirements.txt
-│
-├── data/                   # Datasets & logs
-│   ├── raw/               # Original CSV datasets
-│   ├── processed/        # Cleaned datasets
-│   └── logs/             # System logs
-│
-├── docs/                  # Presentation & Documentation
-│   ├── architecture.png
-│   ├── ppt_storyline.md
-│   └── demo_script.txt
-│
-├── scripts/
-│   └── run_all.bat       # One-click system launcher
-│
-├── .gitignore
-└── README.md
-```
-
----
-
 ## ⚙️ Tech Stack
 
 | Layer     | Technology                     |
@@ -302,6 +261,12 @@ This launches:
 ## 👨‍💻 Author
 
 **Suresh Kumar**
+M.Tech Integrated – Data Science
+VIT
+**Rakesh**
+M.Tech Integrated – Data Science
+VIT
+**Sruthilaiya**
 M.Tech Integrated – Data Science
 VIT
 
