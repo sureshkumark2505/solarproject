@@ -7,12 +7,12 @@ from twilio.rest import Client
 load_dotenv()
 
 # ===== TWILIO CREDENTIALS (FROM ENV) =====
-#ACCOUNT_SID = os.getenv("AC69b588c6d03e3da1c423aa3d07ef9ad1")
-#AUTH_TOKEN = os.getenv("b506cd068ac6d495a82a421673c6da2c")
+ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 
 # ===== WHATSAPP NUMBERS =====
-#FROM_WHATSAPP = os.getenv("whatsapp:+14155238886")   # example: whatsapp:+14155238886
-TO_WHATSAPP = os.getenv("whatsapp:+919342836527")       # example: whatsapp:+91XXXXXXXXXX
+FROM_WHATSAPP = os.getenv("TWILIO_FROM_WHATSAPP")   # example: whatsapp:+14155238886
+TO_WHATSAPP = os.getenv("TWILIO_TO_WHATSAPP")       # example: whatsapp:+91XXXXXXXXXX
 
 def send_whatsapp_message(message_body):
     """
