@@ -263,9 +263,13 @@ This launches:
 **Suresh Kumar**
 M.Tech Integrated – Data Science
 VIT
+
+---
 **Rakesh**
 M.Tech Integrated – Data Science
 VIT
+
+---
 **Sruthilaiya**
 M.Tech Integrated – Data Science
 VIT
@@ -287,7 +291,5 @@ This project demonstrates:
 A complete, real-world inspired smart energy system — not just a machine learning model.
 
 ---
-
-If you’re a judge, recruiter, or collaborator — feel free to reach out! ☀️🚀
 
 
