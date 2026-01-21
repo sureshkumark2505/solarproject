@@ -3,7 +3,7 @@ from ultralytics import YOLO
 
 # Absolute path to model
 BASE_DIR = os.path.dirname(__file__)
-MODEL_PATH = os.path.join(BASE_DIR, "..", "model", "best.pt")
+MODEL_PATH = os.path.join(BASE_DIR, "..", "model", "best1.pt")
 
 # Load YOLO model once
 model = YOLO(MODEL_PATH)

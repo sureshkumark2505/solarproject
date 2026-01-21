@@ -11,7 +11,7 @@ from inference.predict_power import predict_expected_power
 from inference.classify_dust import classify_panel
 
 BASE_DIR = os.path.dirname(__file__)
-IMAGE_PATH = os.path.join(BASE_DIR, "images", "dust1.jpeg")
+IMAGE_PATH = os.path.join(BASE_DIR, "images", "clean1.jpeg")
 print(f"Image path: {IMAGE_PATH}")
 API_URL = "http://127.0.0.1:5000/api/summary"
 
