@@ -4,11 +4,6 @@ import pandas as pd
 import datetime
 import time
 import os
-import sys
-
-# Add the whatsapp module to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'whatsapp'))
-from whatsapp import send_whatsapp_message
 
 API_URL = "http://127.0.0.1:5000/api/summary"
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
@@ -22,7 +17,8 @@ HISTORY_FILE = "history.csv"
 st.set_page_config(
     page_title="Solar Edge AI Dashboard",
     page_icon="☀️",
-    layout="centered"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # ------------------------
@@ -31,20 +27,22 @@ st.set_page_config(
 st.markdown("""
 <style>
 .big-number {
-    font-size: 36px;
+    font-size: 24px;
     font-weight: bold;
     color: #ff9800;
 }
 .card {
-    padding: 15px;
-    border-radius: 12px;
+    padding: 10px;
+    border-radius: 8px;
     background-color: #f9f9f9;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
-    margin-bottom: 10px;
+    box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 8px;
 }
-.status-good { color: #2e7d32; font-weight: bold; }
-.status-warn { color: #f9a825; font-weight: bold; }
-.status-bad { color: #c62828; font-weight: bold; }
+.status-good { color: #2e7d32; font-weight: bold; font-size: 14px; }
+.status-warn { color: #f9a825; font-weight: bold; font-size: 14px; }
+.status-bad { color: #c62828; font-weight: bold; font-size: 14px; }
+h2 { font-size: 18px; margin: 10px 0 5px 0; }
+h3 { font-size: 14px; margin: 8px 0 3px 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -64,6 +62,7 @@ def fetch_weather():
             "latitude": LAT,
             "longitude": LON,
             "hourly": "precipitation,cloudcover,wind_speed_10m,relative_humidity_2m,uv_index",
+            "daily": "uv_index_max",
             "forecast_days": 1,
             "timezone": "auto"
         }
@@ -75,9 +74,14 @@ def fetch_weather():
 def calculate_weather_summary(weather_json):
     rain = weather_json["hourly"]["precipitation"]
     clouds = weather_json["hourly"]["cloudcover"]
+    uv_hourly = weather_json["hourly"]["uv_index"]
+    
+    # Get daily max UV index
+    uv_max = weather_json["daily"]["uv_index_max"][0] if "daily" in weather_json and "uv_index_max" in weather_json["daily"] else max(uv_hourly)
 
     rain_sum = sum(rain)
     cloud_avg = sum(clouds) / len(clouds)
+    uv_current = uv_hourly[0]
 
     return {
         "rain_expected": rain_sum > 1,
@@ -85,7 +89,8 @@ def calculate_weather_summary(weather_json):
         "cloud_cover_percent": round(cloud_avg, 1),
         "wind_speed_kmh": weather_json["hourly"]["wind_speed_10m"][0],
         "humidity_percent": weather_json["hourly"]["relative_humidity_2m"][0],
-        "uv_index": weather_json["hourly"]["uv_index"][0]
+        "uv_index": round(uv_current, 2),
+        "uv_index_max": round(uv_max, 2)
     }
 
 def system_decision(dust_detected, vision_label, avg_loss_percent, rain_expected):
@@ -115,11 +120,34 @@ def load_history():
     return pd.DataFrame()
 
 def save_history(row):
+    """Save history row only if it's not a duplicate."""
     df = pd.DataFrame([row])
+    
     if not os.path.exists(HISTORY_FILE):
         df.to_csv(HISTORY_FILE, index=False)
-    else:
-        df.to_csv(HISTORY_FILE, mode="a", header=False, index=False)
+        return
+    
+    # Load existing data
+    existing_df = pd.read_csv(HISTORY_FILE)
+    
+    # Check for duplicate (same time, expected_power, and problem)
+    if len(existing_df) > 0:
+        time_match = existing_df['time'] == row['time']
+        power_match = existing_df['expected_power'] == row['expected_power']
+        
+        # Check problem column if it exists
+        if 'problem' in existing_df.columns and 'problem' in row:
+            problem_match = existing_df['problem'] == row['problem']
+            duplicate = existing_df[time_match & power_match & problem_match]
+        else:
+            duplicate = existing_df[time_match & power_match]
+            
+        if len(duplicate) > 0:
+            # Duplicate found, don't save
+            return
+    
+    # No duplicate, append
+    df.to_csv(HISTORY_FILE, mode="a", header=False, index=False)
 
 def send_cleaning_request(method):
     """
@@ -140,6 +168,12 @@ def send_cleaning_request(method):
 # ------------------------
 st.markdown("## ☀️ Solar Edge AI Dashboard")
 st.caption("Raspberry Pi → Edge AI → API → Mobile Dashboard")
+
+# Add refresh button
+col_refresh = st.columns([5, 1])
+with col_refresh[1]:
+    if st.button("🔄 Refresh", key="refresh_btn"):
+        st.rerun()
 
 solar = fetch_solar_data()
 weather_raw = fetch_weather()
@@ -162,16 +196,28 @@ else:
 if time_key and time_key in solar:
     time_value = solar[time_key]
 else:
-    # Fall back to current UTC time ISO string
-    time_value = datetime.datetime.utcnow().isoformat()
+    # Fall back to standard datetime format
+    time_value = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+# Determine problem based on system status
+problem = "None"
+if solar.get("dust_detected"):
+    problem = "Dust Detected"
+elif solar.get("vision_label") == "BirdDroppings":
+    problem = "Bird Droppings"
+elif solar.get("vision_label") == "ElectricalDamage":
+    problem = "Electrical Damage"
+elif solar.get("avg_loss_percent", 0) > 20:
+    problem = f"High Loss ({solar.get('avg_loss_percent')}%)"
 
 history_row = {
     "time": time_value,
     "expected_power": solar.get("expected_power"),
+    "actual_power": solar.get("expected_power", 0) * (1 - solar.get("avg_loss_percent", 0) / 100),
     "avg_loss_percent": solar.get("avg_loss_percent"),
     "health_score": solar.get("health_score"),
     "vision_label": solar.get("vision_label"),
-    "dust_detected": solar.get("dust_detected")
+    "problem": problem
 }
 save_history(history_row)
 
@@ -181,9 +227,9 @@ history_df = load_history()
 # STATUS CARD
 # ------------------------
 status, status_class, status_reason = system_decision(
-    solar["dust_detected"],
-    solar["vision_label"],
-    solar["avg_loss_percent"],
+    solar.get("dust_detected", False),
+    solar.get("vision_label", "Clean"),
+    solar.get("avg_loss_percent", 0),
     weather["rain_expected"]
 )
 
@@ -214,12 +260,7 @@ if "ACTION REQUIRED" in status or "CLEANING REQUIRED" in status:
     with col3:
         if st.button("👷 Cleaning Agency"):
             send_cleaning_request("cleaning_agency")
-            # Send WhatsApp message
-            whatsapp_message = "🚨 Solar Panel Cleaning Required: Dust detected. Please send cleaning agency immediately."
-            if send_whatsapp_message(whatsapp_message):
-                st.success("Cleaning request sent to Cleaning Agency and WhatsApp!")
-            else:
-                st.success("Cleaning request sent to Cleaning Agency! (WhatsApp demo mode)")
+            st.success("Cleaning request sent to Cleaning Agency!")
 
 # ------------------------
 # PANEL IMAGE
@@ -227,7 +268,7 @@ if "ACTION REQUIRED" in status or "CLEANING REQUIRED" in status:
 if "panel_image" in solar:
     import base64
     image_data = base64.b64decode(solar["panel_image"])
-    st.image(image_data, caption="Panel Image", width=222)
+    st.image(image_data, caption="Panel Image", width=150)
 
 # ------------------------
 # METRICS
@@ -236,17 +277,17 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("### ⚡ Expected Power")
-    st.markdown(f"<div class='big-number'>{solar['expected_power']} W</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='big-number'>{solar.get('expected_power', 0):.0f} W</div>", unsafe_allow_html=True)
 
     st.markdown("### 🏥 Health Score")
-    st.markdown(f"<div class='big-number'>{solar['health_score']}%</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='big-number'>{solar.get('health_score', 0):.0f}%</div>", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("### 📉 Avg Loss %")
-    st.markdown(f"<div class='big-number'>{solar['avg_loss_percent']}%</div>", unsafe_allow_html=True)
+    st.markdown("### 📉 Loss %")
+    st.markdown(f"<div class='big-number'>{solar.get('avg_loss_percent', 0):.1f}%</div>", unsafe_allow_html=True)
 
-    st.markdown("### 👁 Vision Label")
-    st.markdown(f"<div class='big-number'>{solar['vision_label']}</div>", unsafe_allow_html=True)
+    st.markdown("### 👁 Vision")
+    st.markdown(f"<div class='big-number'>{solar.get('vision_label', 'N/A')}</div>", unsafe_allow_html=True)
 
 # ------------------------
 # GRAPHS
@@ -254,7 +295,7 @@ with col2:
 st.markdown("## 📊 Performance Graph (8 AM - 6 PM)")
 
 if len(history_df) > 2:
-    history_df["time"] = pd.to_datetime(history_df["time"])
+    history_df["time"] = pd.to_datetime(history_df["time"], format="mixed", utc=False)
     # Filter to daytime hours 8 AM to 6 PM
     daytime_df = history_df[(history_df["time"].dt.hour >= 8) & (history_df["time"].dt.hour <= 18)]
 
@@ -267,6 +308,56 @@ if len(history_df) > 2:
         st.info("No daytime data available for graph.")
 else:
     st.info("Collecting data for performance visualization...")
+
+# ------------------------
+# FORECAST GRAPH (Dummy 7-hour forecast)
+# ------------------------
+st.markdown("## 📈 Today's Energy Forecast")
+
+hours = ["6 AM", "8 AM", "10 AM", "12 PM", "2 PM", "4 PM", "6 PM"]
+forecasted_energy = solar.get("forecasted_energy_kWh", 100)
+forecast = [
+    forecasted_energy * 0.05,
+    forecasted_energy * 0.12,
+    forecasted_energy * 0.22,
+    forecasted_energy * 0.28,
+    forecasted_energy * 0.20,
+    forecasted_energy * 0.10,
+    forecasted_energy * 0.03,
+]
+
+forecast_df = pd.DataFrame({
+    "Time": hours,
+    "Energy (kWh)": forecast
+})
+
+st.bar_chart(forecast_df.set_index("Time"), height=250)
+
+# ------------------------
+# LAST 5 DAYS SUMMARY TABLE
+# ------------------------
+st.markdown("## 📅 Last 5 Days Summary")
+
+if len(history_df) > 0:
+    # Convert time to datetime - handle mixed formats
+    history_df["time"] = pd.to_datetime(history_df["time"], format="mixed", utc=False)
+    
+    # Sort by time descending and take last 5 days
+    history_df_sorted = history_df.sort_values("time", ascending=False).head(5)
+    
+    # Reorder columns for display
+    display_df = history_df_sorted[["time", "expected_power", "actual_power", "avg_loss_percent", "problem"]].copy()
+    display_df.columns = ["Date", "Expected Power (W)", "Actual Power (W)", "Loss %", "Problem"]
+    
+    # Round power values
+    display_df["Expected Power (W)"] = display_df["Expected Power (W)"].round(1)
+    display_df["Actual Power (W)"] = display_df["Actual Power (W)"].round(1)
+    display_df = display_df.reset_index(drop=True)
+    
+    # Display as table
+    st.dataframe(display_df, use_container_width=True)
+else:
+    st.info("No historical data available yet.")
 
 # ------------------------
 # WEATHER
@@ -282,11 +373,12 @@ with wcol1:
 
 with wcol2:
     st.write("🌬 Wind Speed:", f"{weather['wind_speed_kmh']} km/h")
-    st.write("🌞 UV Index:", weather["uv_index"])
-    st.write("🌧 Rain Volume:", f"{weather['rain_volume_mm']} mm")
+    st.write("🌞 Current UV:", weather.get("uv_index", 0))
+    st.write("☀️ Max UV Today:", weather.get("uv_index_max", 0))
 
 st.caption("Powered by Raspberry Pi Edge AI • Open-Meteo • Streamlit")
 
-# Auto refresh
-time.sleep(REFRESH_SECONDS)
-st.rerun()
+# Remove auto-refresh - user controls it with button
+# Uncomment below if you want auto-refresh
+# time.sleep(REFRESH_SECONDS)
+# st.rerun()
