@@ -292,20 +292,22 @@ with col2:
 # ------------------------
 # GRAPHS
 # ------------------------
-st.markdown("## 📊 Performance Graph (8 AM - 6 PM)")
+st.markdown("## 📊 24-Hour Performance Graph")
 
-if len(history_df) > 2:
-    history_df["time"] = pd.to_datetime(history_df["time"], format="mixed", utc=False)
-    # Filter to daytime hours 8 AM to 6 PM
-    daytime_df = history_df[(history_df["time"].dt.hour >= 8) & (history_df["time"].dt.hour <= 18)]
-
-    if len(daytime_df) > 0:
-        st.line_chart(
-            daytime_df.set_index("time")[["expected_power"]],
-            height=250
-        )
-    else:
-        st.info("No daytime data available for graph.")
+if len(history_df) > 1:
+    history_df_sorted = history_df.sort_values("time", ascending=True)
+    history_df_sorted["time"] = pd.to_datetime(history_df_sorted["time"], format="mixed", utc=False)
+    
+    # Create chart with multiple metrics
+    chart_df = history_df_sorted[["time", "expected_power", "actual_power"]].copy()
+    chart_df.columns = ["Time", "Expected Power (W)", "Actual Power (W)"]
+    chart_df = chart_df.set_index("Time")
+    
+    # Display continuous line chart
+    st.line_chart(chart_df, height=300)
+    
+    # Also show a continuous area chart
+    st.area_chart(chart_df, height=250)
 else:
     st.info("Collecting data for performance visualization...")
 
