@@ -101,4 +101,14 @@ def run_edge():
         print(f"Failed to send: {response.status_code}")
 
 if __name__ == "__main__":
-    run_edge()
+    print("🚀 Starting Edge AI Runner with continuous monitoring...")
+    print("📊 Data will be updated every 5 seconds")
+    print("Press Ctrl+C to stop\n")
+    
+    try:
+        while True:
+            run_edge()
+            print("⏳ Waiting 5 seconds before next update...\n")
+            time.sleep(5)  # Update every 5 seconds
+    except KeyboardInterrupt:
+        print("\n🛑 Edge AI Runner stopped by user")

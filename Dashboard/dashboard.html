@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>☀️ Solar Edge AI Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        h1 {
+            font-size: 32px;
+            color: #333;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .refresh-btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: #f57c00;
+            transform: translateY(-2px);
+        }
+
+        .status-card {
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .status-good {
+            background: linear-gradient(135deg, #4caf50 0%, #81c784 100%);
+            color: white;
+        }
+
+        .status-warn {
+            background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
+            color: white;
+        }
+
+        .status-bad {
+            background: linear-gradient(135deg, #f44336 0%, #e57373 100%);
+            color: white;
+        }
+
+        .status-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .status-reason {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .cleaning-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .clean-btn {
+            background: white;
+            border: 2px solid #ff9800;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+            color: #ff9800;
+            font-weight: bold;
+        }
+
+        .clean-btn:hover {
+            background: #ff9800;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .metric-title {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .metric-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ff9800;
+        }
+
+        .chart-container {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .chart-title {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto !important;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .weather-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .weather-item {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .weather-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .weather-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+
+        .panel-image {
+            max-width: 300px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>☀️ Solar Edge AI Dashboard</h1>
+                <div class="subtitle">Raspberry Pi → Edge AI → API → Mobile Dashboard</div>
+            </div>
+            <button class="refresh-btn" onclick="refreshData()">🔄 Refresh</button>
+        </div>
+
+        <div id="loading" class="loading">Loading dashboard data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="content" style="display: none;">
+            <!-- Status Card -->
+            <div id="statusCard" class="status-card"></div>
+
+            <!-- Cleaning Options -->
+            <div id="cleaningOptions" style="display: none;">
+                <h2 style="margin-bottom: 15px;">🧹 Select Cleaning Method</h2>
+                <div class="cleaning-options">
+                    <button class="clean-btn" onclick="sendCleaning('robot')">🤖 Robot Cleaning</button>
+                    <button class="clean-btn" onclick="sendCleaning('pressurized_water')">💧 Pressurized Water</button>
+                    <button class="clean-btn" onclick="sendCleaning('cleaning_agency')">👷 Cleaning Agency</button>
+                </div>
+            </div>
+
+            <!-- Panel Image -->
+            <div id="panelImageContainer"></div>
+
+            <!-- Metrics -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-title">⚡ Expected Power</div>
+                    <div class="metric-value" id="expectedPower">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">🏥 Health Score</div>
+                    <div class="metric-value" id="healthScore">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">📉 Loss %</div>
+                    <div class="metric-value" id="lossPercent">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">👁 Vision</div>
+                    <div class="metric-value" id="visionLabel">--</div>
+                </div>
+            </div>
+
+            <!-- Energy Forecast -->
+            <div class="chart-container">
+                <h2 class="chart-title">📈 Today's Energy Forecast</h2>
+                <canvas id="forecastChart"></canvas>
+            </div>
+
+            <!-- Performance Trends -->
+            <div class="chart-container">
+                <h2 class="chart-title">📊 Performance Trends</h2>
+                <div class="grid-2">
+                    <canvas id="powerComparisonChart"></canvas>
+                    <canvas id="healthScoreChart"></canvas>
+                </div>
+                <div class="grid-2" style="margin-top: 20px;">
+                    <canvas id="lossChart"></canvas>
+                    <canvas id="efficiencyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Last Records Table -->
+            <div class="chart-container">
+                <h2 class="chart-title">📅 Last 5 Records Summary</h2>
+                <table id="historyTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Expected Power (W)</th>
+                            <th>Actual Power (W)</th>
+                            <th>Loss %</th>
+                            <th>Problem</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Weather -->
+            <div class="chart-container">
+                <h2 class="chart-title">🌦 Weather Conditions</h2>
+                <div class="weather-grid" id="weatherGrid"></div>
+            </div>
+
+            <div class="footer">
+                Powered by Raspberry Pi Edge AI • Open-Meteo • HTML/JavaScript
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        const API_URL = "http://127.0.0.1:5000/api/summary";
+        const WEATHER_URL = "https://api.open-meteo.com/v1/forecast";
+        const LAT = 12.9184;
+        const LON = 79.1325;
+
+        let charts = {};
+        let historyData = [];
+
+        async function fetchData() {
+            try {
+                const solarResponse = await fetch(API_URL);
+                const solarData = await solarResponse.json();
+
+                const weatherParams = new URLSearchParams({
+                    latitude: LAT,
+                    longitude: LON,
+                    hourly: "precipitation,cloudcover,wind_speed_10m,relative_humidity_2m,uv_index",
+                    daily: "uv_index_max",
+                    forecast_days: 1,
+                    timezone: "auto"
+                });
+
+                const weatherResponse = await fetch(`${WEATHER_URL}?${weatherParams}`);
+                const weatherData = await weatherResponse.json();
+
+                return { solar: solarData, weather: weatherData };
+            } catch (error) {
+                throw new Error("Unable to connect to Edge API or Weather Service");
+            }
+        }
+
+        function calculateWeatherSummary(weatherData) {
+            const rain = weatherData.hourly.precipitation;
+            const clouds = weatherData.hourly.cloudcover;
+            const uvHourly = weatherData.hourly.uv_index;
+
+            const rainSum = rain.reduce((a, b) => a + b, 0);
+            const cloudAvg = clouds.reduce((a, b) => a + b, 0) / clouds.length;
+            const uvMax = weatherData.daily?.uv_index_max?.[0] || Math.max(...uvHourly);
+
+            return {
+                rain_expected: rainSum > 1,
+                rain_volume_mm: rainSum.toFixed(2),
+                cloud_cover_percent: cloudAvg.toFixed(1),
+                wind_speed_kmh: weatherData.hourly.wind_speed_10m[0],
+                humidity_percent: weatherData.hourly.relative_humidity_2m[0],
+                uv_index: uvHourly[0].toFixed(2),
+                uv_index_max: uvMax.toFixed(2)
+            };
+        }
+
+        function systemDecision(dustDetected, visionLabel, avgLossPercent, rainExpected) {
+            if (visionLabel === "ElectricalDamage") {
+                return {
+                    status: "🚨 CRITICAL FAULT",
+                    class: "status-bad",
+                    reason: "Electrical damage detected. Immediate inspection required."
+                };
+            } else if (visionLabel === "BirdDroppings") {
+                return {
+                    status: "🧹 CLEANING REQUIRED",
+                    class: "status-bad",
+                    reason: "Bird droppings detected on panels."
+                };
+            } else if (dustDetected && rainExpected) {
+                return {
+                    status: "🕒 CLEANING POSTPONED",
+                    class: "status-warn",
+                    reason: "Dust detected but rain expected for natural cleaning."
+                };
+            } else if (dustDetected && !rainExpected) {
+                return {
+                    status: "🚨 ACTION REQUIRED",
+                    class: "status-bad",
+                    reason: "Dust detected. Manual cleaning recommended."
+                };
+            } else if (avgLossPercent > 20) {
+                return {
+                    status: "⚠️ HIGH LOSS DETECTED",
+                    class: "status-warn",
+                    reason: `Power loss at ${avgLossPercent}%. Check system.`
+                };
+            } else {
+                return {
+                    status: "✅ SYSTEM HEALTHY",
+                    class: "status-good",
+                    reason: "All systems normal."
+                };
+            }
+        }
+
+        function updateStatusCard(decision) {
+            const statusCard = document.getElementById('statusCard');
+            statusCard.className = `status-card ${decision.class}`;
+            statusCard.innerHTML = `
+                <div class="status-title">${decision.status}</div>
+                <div class="status-reason">${decision.reason}</div>
+            `;
+        }
+
+        function updateMetrics(solar) {
+            document.getElementById('expectedPower').textContent = `${(solar.expected_power || 0).toFixed(0)} W`;
+            document.getElementById('healthScore').textContent = `${(solar.health_score || 0).toFixed(0)}%`;
+            document.getElementById('lossPercent').textContent = `${(solar.avg_loss_percent || 0).toFixed(1)}%`;
+            document.getElementById('visionLabel').textContent = solar.vision_label || 'N/A';
+        }
+
+        function updatePanelImage(solar) {
+            const container = document.getElementById('panelImageContainer');
+            if (solar.panel_image) {
+                container.innerHTML = `<img src="data:image/jpeg;base64,${solar.panel_image}" class="panel-image" alt="Panel Image">`;
+            } else {
+                container.innerHTML = '';
+            }
+        }
+
+        function updateForecastChart(forecastedEnergy) {
+            const ctx = document.getElementById('forecastChart');
+            const hours = ["6 AM", "8 AM", "10 AM", "12 PM", "2 PM", "4 PM", "6 PM"];
+            const forecast = [
+                forecastedEnergy * 0.05,
+                forecastedEnergy * 0.12,
+                forecastedEnergy * 0.22,
+                forecastedEnergy * 0.28,
+                forecastedEnergy * 0.20,
+                forecastedEnergy * 0.10,
+                forecastedEnergy * 0.03
+            ];
+
+            if (charts.forecast) charts.forecast.destroy();
+            charts.forecast = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: hours,
+                    datasets: [{
+                        label: 'Energy (kWh)',
+                        data: forecast,
+                        backgroundColor: 'rgba(255, 152, 0, 0.7)',
+                        borderColor: 'rgba(255, 152, 0, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function saveHistory(solar) {
+            const timestamp = new Date().toISOString();
+            const actualPower = (solar.expected_power || 0) * (1 - (solar.avg_loss_percent || 0) / 100);
+            
+            let problem = "None";
+            if (solar.dust_detected) problem = "Dust Detected";
+            else if (solar.vision_label === "BirdDroppings") problem = "Bird Droppings";
+            else if (solar.vision_label === "ElectricalDamage") problem = "Electrical Damage";
+            else if ((solar.avg_loss_percent || 0) > 20) problem = `High Loss (${solar.avg_loss_percent}%)`;
+
+            historyData.push({
+                time: timestamp,
+                expected_power: solar.expected_power || 0,
+                actual_power: actualPower,
+                avg_loss_percent: solar.avg_loss_percent || 0,
+                health_score: solar.health_score || 0,
+                vision_label: solar.vision_label || "N/A",
+                problem: problem
+            });
+
+            // Keep last 20 records
+            if (historyData.length > 20) {
+                historyData = historyData.slice(-20);
+            }
+
+            // Save to localStorage
+            localStorage.setItem('solarHistory', JSON.stringify(historyData));
+        }
+
+        function loadHistory() {
+            const saved = localStorage.getItem('solarHistory');
+            if (saved) {
+                historyData = JSON.parse(saved);
+            }
+        }
+
+        function updatePerformanceCharts() {
+            if (historyData.length === 0) return;
+
+            const labels = historyData.map(d => new Date(d.time).toLocaleTimeString());
+            const expectedPower = historyData.map(d => d.expected_power);
+            const actualPower = historyData.map(d => d.actual_power);
+            const healthScore = historyData.map(d => d.health_score);
+            const lossPercent = historyData.map(d => d.avg_loss_percent);
+            const efficiency = historyData.map(d => (d.actual_power / d.expected_power * 100) || 0);
+
+            // Power Comparison Chart
+            const ctxPower = document.getElementById('powerComparisonChart');
+            if (charts.powerComparison) charts.powerComparison.destroy();
+            charts.powerComparison = new Chart(ctxPower, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Expected Power',
+                            data: expectedPower,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Actual Power',
+                            data: actualPower,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '⚡ Power Output Comparison'
+                        }
+                    }
+                }
+            });
+
+            // Health Score Chart
+            const ctxHealth = document.getElementById('healthScoreChart');
+            if (charts.healthScore) charts.healthScore.destroy();
+            charts.healthScore = new Chart(ctxHealth, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Health Score',
+                        data: healthScore,
+                        borderColor: 'rgba(46, 125, 50, 1)',
+                        backgroundColor: 'rgba(46, 125, 50, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '🏥 System Health Score'
+                        }
+                    }
+                }
+            });
+
+            // Loss Chart
+            const ctxLoss = document.getElementById('lossChart');
+            if (charts.loss) charts.loss.destroy();
+            charts.loss = new Chart(ctxLoss, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Loss %',
+                        data: lossPercent,
+                        borderColor: 'rgba(198, 40, 40, 1)',
+                        backgroundColor: 'rgba(198, 40, 40, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '📉 Power Loss Percentage'
+                        }
+                    }
+                }
+            });
+
+            // Efficiency Chart
+            const ctxEfficiency = document.getElementById('efficiencyChart');
+            if (charts.efficiency) charts.efficiency.destroy();
+            charts.efficiency = new Chart(ctxEfficiency, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Efficiency %',
+                        data: efficiency,
+                        borderColor: 'rgba(255, 152, 0, 1)',
+                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '📈 Efficiency Ratio'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateHistoryTable() {
+            const tbody = document.querySelector('#historyTable tbody');
+            const last5 = historyData.slice(-5).reverse();
+            
+            tbody.innerHTML = last5.map(record => `
+                <tr>
+                    <td>${new Date(record.time).toLocaleString()}</td>
+                    <td>${record.expected_power.toFixed(1)}</td>
+                    <td>${record.actual_power.toFixed(1)}</td>
+                    <td>${record.avg_loss_percent.toFixed(1)}</td>
+                    <td>${record.problem}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateWeather(weather) {
+            const grid = document.getElementById('weatherGrid');
+            grid.innerHTML = `
+                <div class="weather-item">
+                    <div class="weather-label">🌧 Rain Expected</div>
+                    <div class="weather-value">${weather.rain_expected ? 'Yes' : 'No'}</div>
+                </div>
+                <div class="weather-item">
+                    <div class="weather-label">☁ Cloud Cover</div>
+                    <div class="weather-value">${weather.cloud_cover_percent}%</div>
+                </div>
+                <div class="weather-item">
+                    <div class="weather-label">💧 Humidity</div>
+                    <div class="weather-value">${weather.humidity_percent}%</div>
+                </div>
+                <div class="weather-item">
+                    <div class="weather-label">🌬 Wind Speed</div>
+                    <div class="weather-value">${weather.wind_speed_kmh} km/h</div>
+                </div>
+                <div class="weather-item">
+                    <div class="weather-label">🌞 Current UV</div>
+                    <div class="weather-value">${weather.uv_index}</div>
+                </div>
+                <div class="weather-item">
+                    <div class="weather-label">☀️ Max UV Today</div>
+                    <div class="weather-value">${weather.uv_index_max}</div>
+                </div>
+            `;
+        }
+
+        async function sendCleaning(method) {
+            const cleanUrl = "http://127.0.0.1:5000/api/clean";
+            try {
+                await fetch(cleanUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        method: method,
+                        message: `Panel cleaning required. Method: ${method}`
+                    })
+                });
+                alert(`Cleaning request sent: ${method.replace('_', ' ').toUpperCase()}`);
+            } catch (error) {
+                alert('Failed to send cleaning request');
+            }
+        }
+
+        async function refreshData(showLoading = true) {
+            try {
+                if (showLoading) {
+                    document.getElementById('loading').style.display = 'block';
+                    document.getElementById('error').style.display = 'none';
+                    document.getElementById('content').style.display = 'none';
+                }
+
+                const data = await fetchData();
+                const weather = calculateWeatherSummary(data.weather);
+                const decision = systemDecision(
+                    data.solar.dust_detected || false,
+                    data.solar.vision_label || "Clean",
+                    data.solar.avg_loss_percent || 0,
+                    weather.rain_expected
+                );
+
+                updateStatusCard(decision);
+                updateMetrics(data.solar);
+                updatePanelImage(data.solar);
+                updateForecastChart(data.solar.forecasted_energy_kWh || 100);
+                updateWeather(weather);
+                
+                saveHistory(data.solar);
+                updatePerformanceCharts();
+                updateHistoryTable();
+
+                // Show/hide cleaning options
+                const showCleaning = decision.status.includes("ACTION REQUIRED") || decision.status.includes("CLEANING REQUIRED");
+                document.getElementById('cleaningOptions').style.display = showCleaning ? 'block' : 'none';
+
+                if (showLoading) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('content').style.display = 'block';
+                }
+            } catch (error) {
+                if (showLoading) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error').textContent = error.message;
+                    document.getElementById('error').style.display = 'block';
+                }
+                // Silently fail for background updates
+            }
+        }
+
+        // Initialize
+        loadHistory();
+        refreshData(true);
+
+        // Auto-refresh every 5 seconds without showing loading screen
+        setInterval(() => refreshData(false), 5000);
+    </script>
+</body>
+</html>

@@ -290,27 +290,6 @@ with col2:
     st.markdown(f"<div class='big-number'>{solar.get('vision_label', 'N/A')}</div>", unsafe_allow_html=True)
 
 # ------------------------
-# GRAPHS
-# ------------------------
-st.markdown("## 📊 24-Hour Performance Graph")
-
-if len(history_df) > 1:
-    history_df_sorted = history_df.sort_values("time", ascending=True)
-    history_df_sorted["time"] = pd.to_datetime(history_df_sorted["time"], format="mixed", utc=False)
-    
-    # Create chart with multiple metrics
-    chart_df = history_df_sorted[["time", "expected_power", "actual_power"]].copy()
-    chart_df.columns = ["Time", "Expected Power (W)", "Actual Power (W)"]
-    chart_df = chart_df.set_index("Time")
-    
-    # Display continuous line chart
-    st.line_chart(chart_df, height=300)
-    
-    # Also show a continuous area chart
-    st.area_chart(chart_df, height=250)
-else:
-    st.info("Collecting data for performance visualization...")
-
 # ------------------------
 # FORECAST GRAPH (Dummy 7-hour forecast)
 # ------------------------
@@ -334,6 +313,112 @@ forecast_df = pd.DataFrame({
 })
 
 st.bar_chart(forecast_df.set_index("Time"), height=250)
+
+# ------------------------
+# PERFORMANCE GRAPH (HISTORICAL TRENDS)
+# ------------------------
+st.markdown("## 📊 Performance Trends")
+
+if len(history_df) > 0:
+    # Convert time to datetime - handle mixed formats
+    perf_df = history_df.copy()
+    perf_df["time"] = pd.to_datetime(perf_df["time"], format="mixed", utc=False)
+    
+    # Sort by time ascending
+    perf_df_sorted = perf_df.sort_values("time", ascending=True)
+    
+    # Remove rows with missing values for power metrics
+    perf_df_sorted = perf_df_sorted.dropna(subset=["expected_power", "actual_power", "health_score"])
+    
+    if len(perf_df_sorted) > 0:
+        # Create performance metrics dataframe
+        perf_display = perf_df_sorted[["time", "expected_power", "actual_power", "avg_loss_percent", "health_score"]].copy()
+        perf_display.columns = ["Time", "Expected Power", "Actual Power", "Loss %", "Health Score"]
+        perf_display = perf_display.set_index("Time")
+        
+        # Create multi-line chart
+        col_perf1, col_perf2 = st.columns(2)
+        
+        with col_perf1:
+            st.markdown("### ⚡ Power Output Comparison")
+            power_df = perf_display[["Expected Power", "Actual Power"]].tail(20)
+            st.line_chart(power_df, height=300)
+        
+        with col_perf2:
+            st.markdown("### 🏥 System Health Score Over Time")
+            health_df = perf_display[["Health Score"]].tail(20)
+            st.line_chart(health_df, height=300, color=["#2e7d32"])
+        
+        # Power Loss and Efficiency Trend
+        col_perf3, col_perf4 = st.columns(2)
+        
+        with col_perf3:
+            st.markdown("### 📉 Power Loss Percentage")
+            loss_df = perf_display[["Loss %"]].tail(20)
+            st.line_chart(loss_df, height=300, color=["#c62828"])
+        
+        with col_perf4:
+            st.markdown("### 📈 Efficiency Ratio")
+            efficiency_df = perf_display[["Expected Power", "Actual Power"]].tail(20).copy()
+            efficiency_df["Efficiency %"] = (efficiency_df["Actual Power"] / efficiency_df["Expected Power"] * 100).round(1)
+            efficiency_chart = efficiency_df[["Efficiency %"]]
+            st.line_chart(efficiency_chart, height=300, color=["#ff9800"])
+    else:
+        st.info("No valid performance data available yet.")
+else:
+    st.info("No historical data available yet.")
+
+# ------------------------
+# POWER VS DAYS
+# ------------------------
+st.markdown("## 📊 Power vs Days")
+
+if len(history_df) > 0:
+    # Convert time to datetime - handle mixed formats
+    daily_df = history_df.copy()
+    daily_df["time"] = pd.to_datetime(daily_df["time"], format="mixed", utc=False)
+    
+    # Extract date (without time)
+    daily_df["Date"] = daily_df["time"].dt.date
+    
+    # Remove rows with missing power values
+    daily_df = daily_df.dropna(subset=["expected_power", "actual_power"])
+    
+    if len(daily_df) > 0:
+        # Group by date and calculate daily totals
+        daily_summary = daily_df.groupby("Date").agg({
+            "expected_power": "sum",
+            "actual_power": "sum",
+            "health_score": "mean"
+        }).round(2)
+        
+        # Rename columns for display
+        daily_summary.columns = ["Total Expected Power", "Total Actual Power", "Avg Health Score"]
+        daily_summary = daily_summary.reset_index()
+        daily_summary["Date"] = daily_summary["Date"].astype(str)
+        daily_summary = daily_summary.set_index("Date")
+        
+        col_daily1, col_daily2 = st.columns(2)
+        
+        with col_daily1:
+            st.markdown("### ⚡ Daily Power Generation")
+            power_by_day = daily_summary[["Total Expected Power", "Total Actual Power"]]
+            st.bar_chart(power_by_day, height=300)
+        
+        with col_daily2:
+            st.markdown("### 📈 Daily Health Score")
+            health_by_day = daily_summary[["Avg Health Score"]]
+            st.line_chart(health_by_day, height=300, color=["#2e7d32"])
+        
+        # Display daily summary table
+        st.markdown("### 📋 Daily Summary Table")
+        display_daily = daily_summary.copy()
+        display_daily.columns = ["Total Expected Power (W)", "Total Actual Power (W)", "Avg Health Score (%)"]
+        st.dataframe(display_daily, use_container_width=True)
+    else:
+        st.info("No valid daily power data available yet.")
+else:
+    st.info("No historical data available yet.")
 
 # ------------------------
 # LAST 5 DAYS SUMMARY TABLE
